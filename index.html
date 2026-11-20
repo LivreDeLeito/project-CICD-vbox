@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cyber Runner - Projet CI/CD VirtualBox</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body {
+      background: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    header { text-align: center; margin-bottom: 16px; }
+    h1 { font-size: 1.8rem; color: #38bdf8; }
+    p.subtitle { color: #94a3b8; font-size: 0.95rem; margin-top: 4px; }
+    .scoreboard {
+      display: flex;
+      gap: 24px;
+      background: #1e293b;
+      padding: 10px 24px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      border: 1px solid #334155;
+      font-weight: bold;
+    }
+    .scoreboard span { color: #38bdf8; }
+    canvas {
+      background: #020617;
+      border: 2px solid #38bdf8;
+      border-radius: 12px;
+      box-shadow: 0 0 25px rgba(56, 189, 248, 0.2);
+    }
+    .controls { margin-top: 16px; display: flex; gap: 12px; align-items: center; }
+    button {
+      background: #38bdf8;
+      color: #0f172a;
+      border: none;
+      padding: 10px 20px;
+      font-size: 1rem;
+      font-weight: bold;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #7dd3fc; }
+    .hint { color: #64748b; font-size: 0.85rem; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🚀 Deploy Dodge — CI/CD Edition</h1>
+    <p class="subtitle">Déployé automatiquement via Docker, GitHub Actions & VirtualBox</p>
+  </header>
+
+  <div class="scoreboard">
+    <div>Score : <span id="score">0</span></div>
+    <div>Record : <span id="best">0</span></div>
+  </div>
+
+  <canvas id="game" width="480" height="320"></canvas>
+
+  <div class="controls">
+    <button id="startBtn">Lancer / Rejouer</button>
+  </div>
+  <p class="hint">Utilise les flèches ⬅️ ➡️ (ou Q / D) pour éviter les bugs rouges et attraper les conteneurs bleus !</p>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const bestEl = document.getElementById('best');
+    const startBtn = document.getElementById('startBtn');
+
+    let player, items, score, best = 0, running = false, keys = {};
+
+    document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+    document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+    function initGame() {
+      player = { x: canvas.width / 2 - 20, y: canvas.height - 35, w: 40, h: 16, speed: 6 };
+      items = [];
+      score = 0;
+      scoreEl.textContent = score;
+      running = true;
+      requestAnimationFrame(loop);
+    }
+
+    function spawnItem() {
+      if (Math.random() < 0.045) {
+        const isGood = Math.random() > 0.35;
+        items.push({
+          x: Math.random() * (canvas.width - 20),
+          y: -20,
+          size: 16,
+          speed: 2.5 + Math.random() * 2.5 + score * 0.03,
+          good: isGood
+        });
+      }
+    }
+
+    function update() {
+      if ((keys['arrowleft'] || keys['q']) && player.x > 0) player.x -= player.speed;
+      if ((keys['arrowright'] || keys['d']) && player.x < canvas.width - player.w) player.x += player.speed;
+
+      spawnItem();
+
+      for (let i = items.length - 1; i >= 0; i--) {
+        const it = items[i];
+        it.y += it.speed;
+
+        // Collision
+        if (it.x < player.x + player.w && it.x + it.size > player.x &&
+            it.y < player.y + player.h && it.y + it.size > player.y) {
+          if (it.good) {
+            score += 10;
+            scoreEl.textContent = score;
+            if (score > best) { best = score; bestEl.textContent = best; }
+            items.splice(i, 1);
+          } else {
+            running = false;
+          }
+        } else if (it.y > canvas.height) {
+          items.splice(i, 1);
+        }
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Joueur
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(player.x, player.y, player.w, player.h);
+
+      // Objets
+      items.forEach(it => {
+        ctx.fillStyle = it.good ? '#22c55e' : '#ef4444';
+        ctx.beginPath();
+        ctx.roundRect(it.x, it.y, it.size, it.size, 4);
+        ctx.fill();
+      });
+
+      if (!running) {
+        ctx.fillStyle = 'rgba(2, 6, 23, 0.75)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = 'bold 24px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Build Failed ! Score : ' + score, canvas.width / 2, canvas.height / 2);
+      }
+    }
+
+    function loop() {
+      if (!running) { draw(); return; }
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    startBtn.addEventListener('click', initGame);
+    initGame();
+  </script>
+</body>
+</html>
